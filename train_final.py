@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 from tqdm.auto import tqdm
 
-# ---------------- Data Preparation ----------------
+# Data
 def prepare_data(dataset_dir, csv_path, test_size=0.025, random_state=42):
     orig_df = pd.read_csv(csv_path)
     df = orig_df[orig_df['Label'] != 'Test'].reset_index(drop=True)
@@ -31,16 +31,19 @@ def prepare_data(dataset_dir, csv_path, test_size=0.025, random_state=42):
     features = df[feature_cols].values
     idx = np.arange(len(df))
     tr_idx, val_idx = train_test_split(idx, test_size=test_size, stratify=df['y'], random_state=random_state)
-    p_tr = df.loc[tr_idx, 'path'].tolist(); p_val = df.loc[val_idx, 'path'].tolist()
-    y_tr = df.loc[tr_idx, 'y'].values;        y_val = df.loc[val_idx, 'y'].values
-    X_tr = features[tr_idx];                    X_val = features[val_idx]
+    p_tr = df.loc[tr_idx, 'path'].tolist(); 
+    p_val = df.loc[val_idx, 'path'].tolist()
+    y_tr = df.loc[tr_idx, 'y'].values;        
+    y_val = df.loc[val_idx, 'y'].values
+    X_tr = features[tr_idx];                    
+    X_val = features[val_idx]
 
     scaler = StandardScaler()
     X_tr = scaler.fit_transform(X_tr);         X_val = scaler.transform(X_val)
 
     return (p_tr, X_tr, y_tr), (p_val, X_val, y_val), le, scaler, len(feature_cols)
 
-# ---------------- Dataset ----------------
+# Dataset object
 class CombinedDataset(Dataset):
     def __init__(self, paths, feats, labels, sr, duration, n_fft, hop_length, n_mels, max_frames):
         self.paths, self.feats, self.labels = paths, feats, labels
@@ -61,7 +64,8 @@ class CombinedDataset(Dataset):
         mel_db = (mel_db - mel_db.mean())/(mel_db.std()+1e-6)
         return (torch.from_numpy(mel_db).unsqueeze(0).float(), torch.from_numpy(self.feats[idx]).float(), torch.tensor(self.labels[idx]).long())
 
-# ---------------- Model Components ----------------
+# model definition
+# NEED TO PASTE INTO TEST PY
 class ResidualConvBlock(nn.Module):
     def __init__(self, in_ch, out_ch, drop_prob=0.1):
         super().__init__()
@@ -91,16 +95,16 @@ class ResidualMLPBlock(nn.Module):
         out = self.dropout(out)
         return self.relu(out + x)
 
-# ---------------- Combined Model ----------------
+# Combined Model
 class CombinedNet(nn.Module):
     def __init__(self, n_mels, feat_dim, num_classes):
         super().__init__()
-        # 10 residual conv blocks
+        # residual conv blocks
         chs = [1,64,64,128,128,256,256,512,512,1024,1024,1024]
         self.convs = nn.ModuleList([ResidualConvBlock(chs[i], chs[i+1]) for i in range(len(chs)-1)])
         self.pool = nn.MaxPool2d(2,ceil_mode=True)
         self.gpool = nn.AdaptiveAvgPool2d((1,1))
-        # MLP with dropout
+        # MLP
         self.feat_fc1 = nn.Linear(feat_dim,512)
         self.feat_res = nn.Sequential(ResidualMLPBlock(512), ResidualMLPBlock(512))
         self.feat_dropout = nn.Dropout(0.1)
@@ -118,10 +122,10 @@ class CombinedNet(nn.Module):
         for i, block in enumerate(self.convs):
             x = block(x)
             if i%2==1: x = self.pool(x)
-        x_flat = self.gpool(x).view(x.size(0),-1)  # (B,1024)
+        x_flat = self.gpool(x).view(x.size(0),-1)  
         # feature branch
         f = F.relu(self.feat_fc1(feat)); f = self.feat_res(f); f = self.feat_dropout(f)
-        f = F.relu(self.feat_fc2(f))             # (B,128)
+        f = F.relu(self.feat_fc2(f))            
         # attention
         f_q = f.unsqueeze(1)
         x_proj = self.proj_audio(x_flat).unsqueeze(1)
@@ -132,7 +136,7 @@ class CombinedNet(nn.Module):
         h = F.relu(self.fuse_fc1(h)); h = self.fuse_res(h); h = self.fuse_dropout(h)
         return self.fuse_fc2(h)
 
-# ---------------- Training Loop ----------------
+# train
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug_overfit', action='store_true')
@@ -142,7 +146,8 @@ def main():
     sr, duration = 16000,3.0; n_fft, hop_length, n_mels = 1024,512,64
     max_frames = int(np.ceil(duration*sr/hop_length))
     batch_size = 16 if args.debug_overfit else 32
-    num_epochs,patience=80,25
+    num_epochs=80
+    patience = 25
 
     (p_tr,X_tr,y_tr),(p_val,X_val,y_val),le,scaler,feat_dim = prepare_data(dataset_dir,csv_path)
     num_classes = len(le.classes_)
@@ -151,9 +156,9 @@ def main():
                      hop_length=hop_length, n_mels=n_mels, max_frames=max_frames)
     train_ds = CombinedDataset(p_tr,X_tr,y_tr,**ds_kwargs)
     val_ds   = CombinedDataset(p_val,X_val,y_val,**ds_kwargs)
-    if args.debug_overfit:
-        train_ds = Subset(train_ds,range(min(16,len(train_ds))))
-        val_ds   = Subset(val_ds,  range(min(16,len(val_ds))))
+    #if args.debug_overfit:
+    #    train_ds = Subset(train_ds,range(min(16,len(train_ds))))
+    #    val_ds   = Subset(val_ds,  range(min(16,len(val_ds))))
     train_loader = DataLoader(train_ds,batch_size=batch_size,shuffle=True,num_workers=0)
     val_loader   = DataLoader(val_ds,  batch_size=batch_size,shuffle=False,num_workers=0)
 
