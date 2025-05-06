@@ -1,5 +1,5 @@
 # Audio-Emotion-Classification
-Final project of Rice University ELEC 378.
+Final project of Rice University ELEC 378. Classifies ~5s .wav audio into 7 emotions: Happy, Sad, Angry, Disgusted, Surprised, Fearful, Neutral.
 
 
 Authors:
