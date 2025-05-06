@@ -11,4 +11,4 @@ Rocky Ren, School of Engineering and Computing, Rice University, Houston, TX, lr
 Harry Zhu, School of Natural Sciences, Rice University, Houston, TX
 
 
-Checkpoint available at: 
+Checkpoint available at: https://drive.google.com/file/d/1nahXgwzQnNI2CETw6DL0Yqs8Pg-v3qHs/view?usp=sharing
